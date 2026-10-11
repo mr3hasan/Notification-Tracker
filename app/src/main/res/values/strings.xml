@@ -1,0 +1,114 @@
+<resources>
+    <string name="app_name">Notification Tracker</string>
+    <string name="notification_service_label">Notification Tracker Listener</string>
+
+    <!-- Navigation items -->
+    <string name="nav_home">Home</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_analytics">Insights</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home Screen -->
+    <string name="home_title">Notification Tracker</string>
+    <string name="home_subtitle">Track and organize device alerts</string>
+    <string name="total_notifications_label">Total Notifications</string>
+    <string name="total_notifications_count">0</string>
+    <string name="today_notifications_label">Today</string>
+    <string name="today_notifications_count">0</string>
+    <string name="apps_tracked_label">Apps Monitored</string>
+    <string name="apps_tracked_count">0</string>
+    <string name="access_banner_title">Notification Access Pending</string>
+    <string name="access_banner_desc">Notification Tracker requires Android Notification Access permission to monitor and save alerts on this device.</string>
+    <string name="access_banner_active_title">Notification Access Active</string>
+    <string name="access_banner_active_desc">Listener service is active. Device notifications are securely captured to your local database according to your settings.</string>
+    <string name="empty_notifications_title">No notifications saved yet</string>
+    <string name="empty_notifications_subtitle">Captured notifications will appear here automatically as your device receives alerts.</string>
+    <string name="recent_notifications_header">Recent Activity</string>
+
+    <!-- Categories Screen -->
+    <string name="categories_title">Categories</string>
+    <string name="categories_subtitle">Grouped by source application</string>
+    <string name="category_messages">Messages</string>
+    <string name="category_social">Social &amp; Media</string>
+    <string name="category_finance">Finance &amp; Banking</string>
+    <string name="category_shopping">Shopping &amp; Delivery</string>
+    <string name="category_system">System &amp; Utilities</string>
+
+    <!-- Search Screen -->
+    <string name="search_title">Search Alerts</string>
+    <string name="search_hint">Search by app name, title or text…</string>
+    <string name="search_empty_title">No Notifications Saved Yet</string>
+    <string name="search_empty_desc">Captured notification records will appear here for fast full-text searching and date filtering.</string>
+    <string name="date_filter_start">Start Date</string>
+    <string name="date_filter_end">End Date</string>
+    <string name="date_filter_clear">Clear Dates</string>
+    <string name="date_filter_invalid">Invalid Date Range: End date cannot be before start date.</string>
+
+    <!-- Notification Management Dialogs -->
+    <string name="dialog_delete_title">Delete Notification Record</string>
+    <string name="dialog_delete_message">Are you sure you want to delete this saved notification record from your history? The original notification on your device will remain untouched.</string>
+    <string name="dialog_clear_all_title">Clear All Saved Notifications</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_delete">Delete</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_general">System &amp; Access</string>
+    <string name="settings_section_collection">Notification Collection</string>
+    <string name="settings_section_exclusions">Excluded Apps</string>
+    <string name="settings_section_retention">History Retention Period</string>
+    <string name="settings_section_privacy">Privacy &amp; Data Security</string>
+    <string name="settings_section_storage">Data &amp; Storage</string>
+    <string name="settings_section_about">About &amp; Project</string>
+
+    <string name="settings_service_status">Notification Access</string>
+    <string name="status_access_granted">Active</string>
+    <string name="status_access_not_granted">Not Enabled</string>
+    <string name="status_access_granted_sub">Notification listener permission is granted in Android settings.</string>
+    <string name="status_access_not_granted_sub">Requires manual permission in Android Notification Access settings.</string>
+    <string name="btn_enable_notification_access">Enable Notification Access</string>
+    <string name="btn_manage_notification_access">Manage Notification Access</string>
+    <string name="toast_settings_launch_failed">Unable to open Notification Access settings. Please navigate to Android Settings > Apps > Special app access > Notification access manually.</string>
+
+    <!-- Collection Toggle Strings -->
+    <string name="settings_collection_save_title">Save Incoming Notifications</string>
+    <string name="settings_collection_enabled_sub">Active — incoming notifications are recorded to local storage.</string>
+    <string name="settings_collection_paused_sub">Paused — newly received notifications will not be saved. Existing history remains intact.</string>
+    <string name="settings_collection_permission_note">Note: Android\'s Notification Access permission is managed separately in system settings. Pausing collection in the app does not revoke that permission.</string>
+
+    <!-- Excluded Apps Strings -->
+    <string name="settings_excluded_apps_title">Manage Excluded Apps</string>
+    <string name="settings_excluded_apps_desc">Notifications from excluded applications will be ignored and not saved to history.</string>
+    <string name="settings_excluded_apps_empty">No apps excluded. All apps are monitored.</string>
+    <string name="dialog_excluded_apps_title">Excluded Apps</string>
+    <string name="search_apps_hint">Search installed or monitored apps…</string>
+
+    <!-- Retention Strings -->
+    <string name="settings_retention_title">Auto-Delete Old Records</string>
+    <string name="settings_retention_desc">Automatically purges expired records on startup and when new notifications arrive.</string>
+    <string name="retention_7_days">7 days</string>
+    <string name="retention_30_days">30 days</string>
+    <string name="retention_90_days">90 days</string>
+    <string name="retention_forever">Keep forever</string>
+
+    <!-- Clear All Saved Records -->
+    <string name="btn_clear_all_records">Clear All Saved Records</string>
+
+    <!-- Privacy Strings -->
+    <string name="privacy_local_storage_title">100% On-Device Local Storage</string>
+    <string name="privacy_local_storage_desc">All notification records are stored exclusively in your device\'s local Room database. No data is ever uploaded to a server, cloud service, or remote API.</string>
+    <string name="privacy_listener_title">How Notification Access Works</string>
+    <string name="privacy_listener_desc">Android\'s NotificationListenerService allows the app to inspect posted status bar alerts. Pausing collection inside the app stops saving alerts, but the Android system permission remains active until toggled in Android Settings.</string>
+    <string name="privacy_sensitive_title">Private &amp; Sensitive Notification Content</string>
+    <string name="privacy_sensitive_desc">Notifications frequently contain private communications, personal details, or verification codes. Notification Tracker does not claim to magically detect or redact sensitive content; we recommend excluding sensitive banking or messaging apps using Excluded Apps.</string>
+    <string name="privacy_shade_title">Original Notifications Are Untouched</string>
+    <string name="privacy_shade_desc">Deleting records or clearing history in Notification Tracker only removes your local archive. The original notifications on your lock screen and notification shade remain completely unaltered.</string>
+
+    <string name="settings_storage_local">Storage Mode</string>
+    <string name="settings_storage_local_sub">100% On-device, no cloud accounts needed</string>
+    <string name="settings_app_version">App Version</string>
+    <string name="settings_version_value">1.3.0 (Settings &amp; Privacy)</string>
+    <string name="settings_github_repo">GitHub Repository</string>
+    <string name="settings_github_repo_val">Notification-Tracker</string>
+</resources>

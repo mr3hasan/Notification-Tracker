@@ -26,6 +26,23 @@ interface NotificationDao {
 
   @Query(
     """
+    SELECT * FROM notifications 
+    WHERE package_name = :packageName 
+      AND title = :title 
+      AND content = :content 
+      AND post_time >= :minPostTime
+    LIMIT 1
+    """,
+  )
+  suspend fun findRecentNotification(
+    packageName: String,
+    title: String,
+    content: String,
+    minPostTime: Long,
+  ): NotificationRecord?
+
+  @Query(
+    """
     SELECT COUNT(*) FROM notifications 
     WHERE package_name = :packageName 
       AND title = :title 

@@ -36,8 +36,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -106,8 +113,36 @@ fun AppCategoryDetailScreen(
     }.timeInMillis
   }
 
-  val displayedRecords = remember(allRecords, searchQuery, selectedFilterIndex) {
+  // Selected conversation folder filter (null means "All Chats / Folders")
+  var selectedConversationFolder by remember { mutableStateOf<String?>(null) }
+
+  // Extract all distinct chat / sender / group folders with their count and latest timestamp
+  val conversationFolders = remember(allRecords) {
+    allRecords
+      .groupBy { record ->
+        com.example.util.ConversationUtils.extractConversationName(record.title, appName)
+      }
+      .map { (convName, records) ->
+        val latestTime = records.maxOfOrNull { it.postTime } ?: 0L
+        val isGroup = records.any { it.title.contains(":") }
+        ConversationFolderInfo(
+          name = convName,
+          count = records.size,
+          latestTime = latestTime,
+          isGroup = isGroup,
+        )
+      }
+      .sortedByDescending { it.latestTime }
+  }
+
+  val displayedRecords = remember(allRecords, searchQuery, selectedFilterIndex, selectedConversationFolder) {
     allRecords.filter { record ->
+      val matchesFolder = if (selectedConversationFolder == null) {
+        true
+      } else {
+        com.example.util.ConversationUtils.extractConversationName(record.title, appName) == selectedConversationFolder
+      }
+
       val matchesSearch = if (searchQuery.isBlank()) {
         true
       } else {
@@ -121,7 +156,7 @@ fun AppCategoryDetailScreen(
         else -> true
       }
 
-      matchesSearch && matchesFilter
+      matchesFolder && matchesSearch && matchesFilter
     }
   }
 
@@ -295,6 +330,74 @@ fun AppCategoryDetailScreen(
                 label = { Text(option) },
                 modifier = Modifier.testTag("app_filter_chip_$index"),
               )
+            }
+          }
+        }
+
+        // Horizontal Row of Chat / Contact / Group Folders
+        if (conversationFolders.size > 1) {
+          item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(
+                  text = "Chat & Contact Folders",
+                  style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                  color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (selectedConversationFolder != null) {
+                  TextButton(
+                    onClick = { selectedConversationFolder = null },
+                    modifier = Modifier.testTag("btn_clear_chat_folder"),
+                  ) {
+                    Text("Show All", fontSize = 12.sp)
+                  }
+                }
+              }
+
+              androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().testTag("conversation_folders_row"),
+              ) {
+                // "All Chats" Chip
+                item {
+                  FilterChip(
+                    selected = selectedConversationFolder == null,
+                    onClick = { selectedConversationFolder = null },
+                    label = { Text("All (${allRecords.size})", fontSize = 12.sp) },
+                    leadingIcon = {
+                      Icon(
+                        imageVector = Icons.Default.Forum,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                      )
+                    },
+                    modifier = Modifier.testTag("folder_chip_all"),
+                  )
+                }
+
+                items(conversationFolders) { folder ->
+                  FilterChip(
+                    selected = selectedConversationFolder == folder.name,
+                    onClick = {
+                      selectedConversationFolder = if (selectedConversationFolder == folder.name) null else folder.name
+                    },
+                    label = { Text("${folder.name} (${folder.count})", fontSize = 12.sp) },
+                    leadingIcon = {
+                      Icon(
+                        imageVector = if (folder.isGroup) Icons.Default.Group else Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = if (selectedConversationFolder == folder.name) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                      )
+                    },
+                    modifier = Modifier.testTag("folder_chip_${folder.name.hashCode()}"),
+                  )
+                }
+              }
             }
           }
         }
@@ -562,3 +665,10 @@ private fun AppNotificationRecordItem(
     }
   }
 }
+
+private data class ConversationFolderInfo(
+  val name: String,
+  val count: Int,
+  val latestTime: Long,
+  val isGroup: Boolean,
+)

@@ -24,16 +24,31 @@ class NotificationRepository(private val notificationDao: NotificationDao) {
   }
 
   suspend fun insertNotification(record: NotificationRecord): Boolean {
-    // Check for duplicate callbacks within 2000 milliseconds
+    // 1. Exact match deduplication: if exact same content and package was received within 15 seconds
+    val recent = notificationDao.findRecentNotification(
+      packageName = record.packageName,
+      title = record.title,
+      content = record.content,
+      minPostTime = record.postTime - 15_000L,
+    )
+    if (recent != null) {
+      // It's a duplicate repost by the app (e.g. WhatsApp updating unread counter or status)
+      return false
+    }
+
+    // 2. Also check if the message in group chat is a slight title variation (e.g. "Digital Sample Group" vs "Digital Sample Group : Rafin")
+    val conv1 = com.example.util.ConversationUtils.extractConversationName(record.title, record.appName)
+    // Avoid inserting duplicate if same conversation and exact same content within 15 seconds
     val duplicateCount = notificationDao.countRecentDuplicates(
       packageName = record.packageName,
       title = record.title,
       content = record.content,
-      minPostTime = record.postTime - 2000L,
+      minPostTime = record.postTime - 15_000L,
     )
     if (duplicateCount > 0) {
       return false
     }
+
     notificationDao.insert(record)
     return true
   }

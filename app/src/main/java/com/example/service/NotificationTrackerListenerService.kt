@@ -40,6 +40,17 @@ class NotificationTrackerListenerService : NotificationListenerService() {
   override fun onListenerConnected() {
     super.onListenerConnected()
     Log.d(TAG, "Notification listener connected.")
+    // Instantly capture any active notifications currently sitting in the status bar
+    try {
+      val activeSbns = activeNotifications
+      if (!activeSbns.isNullOrEmpty()) {
+        for (sbn in activeSbns) {
+          onNotificationPosted(sbn)
+        }
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error collecting initial active notifications", e)
+    }
   }
 
   override fun onListenerDisconnected() {
@@ -57,11 +68,6 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       return
     }
 
-    // 2. Capture new posted notifications only after notification access has been granted
-    if (!NotificationAccessUtils.isNotificationAccessGranted(this)) {
-      return
-    }
-
     // 3. Check if collection is currently paused by user in Settings
     if (settingsRepository.isCollectionPaused()) {
       return
@@ -76,19 +82,47 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val notification = sbn.notification ?: return
     val extras = notification.extras
 
+    // Extract title (supports standard title, conversation title, big title)
     val titleCharSequence = extras?.getCharSequence(Notification.EXTRA_TITLE)
-    val textCharSequence = extras?.getCharSequence(Notification.EXTRA_TEXT)
+      ?: extras?.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
+      ?: extras?.getCharSequence(Notification.EXTRA_TITLE_BIG)
+
+    var textCharSequence = extras?.getCharSequence(Notification.EXTRA_TEXT)
       ?: extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)
+      ?: extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)
+      ?: extras?.getCharSequence(Notification.EXTRA_INFO_TEXT)
 
-    val title = titleCharSequence?.toString()?.trim() ?: ""
-    val text = textCharSequence?.toString()?.trim() ?: ""
-
-    // Ignore completely empty payloads
-    if (title.isEmpty() && text.isEmpty()) {
-      return
+    // For messaging apps like WhatsApp that bundle multiple messages as EXTRA_TEXT_LINES
+    if (textCharSequence.isNullOrBlank() && extras != null) {
+      val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+      if (!textLines.isNullOrEmpty()) {
+        textCharSequence = textLines.joinToString("\n")
+      }
     }
 
-    // 4. Extract display name of source app when available
+    // For modern chat apps (Facebook Messenger, Instagram, Signal, Google Messages) using Notification.MessagingStyle
+    if (textCharSequence.isNullOrBlank() && extras != null) {
+      try {
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (!messages.isNullOrEmpty()) {
+          val lastMessageBundle = messages.lastOrNull() as? android.os.Bundle
+          val msgText = lastMessageBundle?.getCharSequence("text")
+          val sender = lastMessageBundle?.getCharSequence("sender")
+          if (!msgText.isNullOrBlank()) {
+            textCharSequence = if (!sender.isNullOrBlank()) "$sender: $msgText" else msgText
+          }
+        }
+      } catch (ignored: Exception) {
+        // Fallback safely if parcelable casting varies by OS
+      }
+    }
+
+    // Fallback to tickerText if text is still empty
+    if (textCharSequence.isNullOrBlank()) {
+      textCharSequence = notification.tickerText
+    }
+
+    // Extract display name of source app when available
     val appDisplayName = try {
       val appInfo = packageManager.getApplicationInfo(sourcePackage, 0)
       packageManager.getApplicationLabel(appInfo).toString()
@@ -96,6 +130,17 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       sourcePackage
     } catch (e: Exception) {
       sourcePackage
+    }
+
+    var title = titleCharSequence?.toString()?.trim() ?: ""
+    var text = textCharSequence?.toString()?.trim() ?: ""
+
+    // Never drop any notification: if both are blank, use app name and alert placeholder
+    if (title.isEmpty() && text.isEmpty()) {
+      title = appDisplayName
+      text = "Notification alert received"
+    } else if (title.isEmpty()) {
+      title = appDisplayName
     }
 
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()

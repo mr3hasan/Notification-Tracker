@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
@@ -42,6 +43,32 @@ object NotificationAccessUtils {
     } catch (e: Exception) {
       Log.e(TAG, "Error checking notification access status", e)
       false
+    }
+  }
+
+  /**
+   * On modern Android / Xiaomi devices, even after the user toggles permission ON,
+   * the Android OS sometimes does not immediately bind the NotificationListenerService.
+   * Toggling the ComponentName state nudges Android PackageManager to immediately bind the service.
+   */
+  fun triggerServiceRebind(context: Context) {
+    try {
+      if (!isNotificationAccessGranted(context)) return
+      val component = ComponentName(context, NotificationTrackerListenerService::class.java)
+      val pm = context.packageManager
+      pm.setComponentEnabledSetting(
+        component,
+        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+        PackageManager.DONT_KILL_APP,
+      )
+      pm.setComponentEnabledSetting(
+        component,
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+        PackageManager.DONT_KILL_APP,
+      )
+      Log.d(TAG, "Triggered NotificationListenerService rebind.")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to rebind NotificationListenerService", e)
     }
   }
 

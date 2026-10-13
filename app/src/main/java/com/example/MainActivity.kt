@@ -24,6 +24,12 @@ class MainActivity : ComponentActivity() {
       }
     }
   }
+
+  override fun onResume() {
+    super.onResume()
+    // Rebind listener service if access is granted (critical for Xiaomi / MIUI / HyperOS)
+    com.example.util.NotificationAccessUtils.triggerServiceRebind(this)
+  }
 }
 
 @Preview(showBackground = true)

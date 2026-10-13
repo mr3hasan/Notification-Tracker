@@ -109,7 +109,11 @@ fun HomeScreen(
   DisposableEffect(lifecycleOwner) {
     val observer = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {
-        isAccessGranted = NotificationAccessUtils.isNotificationAccessGranted(context)
+        val granted = NotificationAccessUtils.isNotificationAccessGranted(context)
+        isAccessGranted = granted
+        if (granted) {
+          NotificationAccessUtils.triggerServiceRebind(context)
+        }
       }
     }
     lifecycleOwner.lifecycle.addObserver(observer)

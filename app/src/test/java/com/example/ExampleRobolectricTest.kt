@@ -465,4 +465,50 @@ class ExampleRobolectricTest {
     val stillPresent = repository.allNotifications.first().any { it.id == inserted.id }
     assertTrue(stillPresent)
   }
+
+  @Test
+  fun `test deduplication allows legitimate consecutive messages`() = runBlocking {
+    val t0 = 100_000L
+    val msg1 = NotificationRecord(
+      packageName = "com.chat",
+      appName = "Chat App",
+      title = "Friend",
+      content = "Yes",
+      postTime = t0,
+    )
+    val inserted1 = repository.insertNotification(msg1)
+    assertTrue(inserted1)
+
+    // Immediate duplicate repost within 1 second -> rejected
+    val duplicateRepost = NotificationRecord(
+      packageName = "com.chat",
+      appName = "Chat App",
+      title = "Friend",
+      content = "Yes",
+      postTime = t0 + 500L,
+    )
+    val insertedDup = repository.insertNotification(duplicateRepost)
+    assertFalse(insertedDup)
+
+    // Legitimate consecutive message arriving 4 seconds later -> accepted
+    val consecutiveMsg = NotificationRecord(
+      packageName = "com.chat",
+      appName = "Chat App",
+      title = "Friend",
+      content = "Yes",
+      postTime = t0 + 4000L,
+    )
+    val insertedConsecutive = repository.insertNotification(consecutiveMsg)
+    assertTrue(insertedConsecutive)
+  }
+
+  @Test
+  fun `test summary text detection helper`() {
+    assertTrue(com.example.service.NotificationTrackerListenerService.isSummaryText("2 new messages"))
+    assertTrue(com.example.service.NotificationTrackerListenerService.isSummaryText("3 messages from 2 chats"))
+    assertTrue(com.example.service.NotificationTrackerListenerService.isSummaryText("1 new message"))
+    assertTrue(com.example.service.NotificationTrackerListenerService.isSummaryText("new messages"))
+    assertFalse(com.example.service.NotificationTrackerListenerService.isSummaryText("Hello, how are you?"))
+    assertFalse(com.example.service.NotificationTrackerListenerService.isSummaryText("Your OTP is 492012"))
+  }
 }

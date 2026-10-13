@@ -39,6 +39,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   override fun onListenerConnected() {
     super.onListenerConnected()
+    isConnected = true
     Log.d(TAG, "Notification listener connected.")
     // Instantly capture any active notifications currently sitting in the status bar
     try {
@@ -48,6 +49,15 @@ class NotificationTrackerListenerService : NotificationListenerService() {
           onNotificationPosted(sbn)
         }
       }
+      // Periodically prune expired notifications once on connect
+      serviceScope.launch {
+        try {
+          val retention = settingsRepository.getRetentionPeriod()
+          repository.purgeExpired(retention)
+        } catch (e: Exception) {
+          Log.e(TAG, "Error purging expired notifications on connect", e)
+        }
+      }
     } catch (e: Exception) {
       Log.e(TAG, "Error collecting initial active notifications", e)
     }
@@ -55,7 +65,13 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   override fun onListenerDisconnected() {
     super.onListenerDisconnected()
-    Log.d(TAG, "Notification listener disconnected.")
+    isConnected = false
+    Log.d(TAG, "Notification listener disconnected. Requesting auto-rebind...")
+    try {
+      requestRebind(android.content.ComponentName(this, NotificationTrackerListenerService::class.java))
+    } catch (e: Exception) {
+      Log.w(TAG, "Auto requestRebind failed on disconnect", e)
+    }
   }
 
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -68,40 +84,41 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       return
     }
 
-    // 3. Check if collection is currently paused by user in Settings
+    // 2. Check if collection is currently paused by user in Settings
     if (settingsRepository.isCollectionPaused()) {
       return
     }
 
-    // 4. Check if the source app is in the user's excluded apps list
+    // 3. Check if the source app is in the user's excluded apps list
     if (settingsRepository.isAppExcluded(sourcePackage)) {
       return
     }
 
-    // 3. Extract notification content safely
+    // 4. Extract notification content safely with complete Android fallbacks
     val notification = sbn.notification ?: return
     val extras = notification.extras
 
-    // Extract title (supports standard title, conversation title, big title)
+    // Extract title (supports standard title, conversation title, big title, android extras)
     val titleCharSequence = extras?.getCharSequence(Notification.EXTRA_TITLE)
       ?: extras?.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
       ?: extras?.getCharSequence(Notification.EXTRA_TITLE_BIG)
+      ?: extras?.getCharSequence("android.title")
+      ?: extras?.getCharSequence("android.conversationTitle")
 
     var textCharSequence = extras?.getCharSequence(Notification.EXTRA_TEXT)
       ?: extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)
       ?: extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)
       ?: extras?.getCharSequence(Notification.EXTRA_INFO_TEXT)
+      ?: extras?.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)
+      ?: extras?.getCharSequence("android.text")
+      ?: extras?.getCharSequence("android.bigText")
 
-    // For messaging apps like WhatsApp that bundle multiple messages as EXTRA_TEXT_LINES
-    if (textCharSequence.isNullOrBlank() && extras != null) {
-      val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-      if (!textLines.isNullOrEmpty()) {
-        textCharSequence = textLines.joinToString("\n")
-      }
-    }
+    val textStr = textCharSequence?.toString()?.trim()
+    val isSummary = isSummaryText(textStr)
 
-    // For modern chat apps (Facebook Messenger, Instagram, Signal, Google Messages) using Notification.MessagingStyle
-    if (textCharSequence.isNullOrBlank() && extras != null) {
+    // For modern chat apps (WhatsApp, Facebook Messenger, Telegram, Signal, Google Messages) using Notification.MessagingStyle
+    // When multiple messages arrive, WhatsApp sets EXTRA_TEXT to e.g. "2 new messages", while the actual latest message is in EXTRA_MESSAGES!
+    if ((textCharSequence.isNullOrBlank() || isSummary) && extras != null) {
       try {
         val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
         if (!messages.isNullOrEmpty()) {
@@ -109,11 +126,26 @@ class NotificationTrackerListenerService : NotificationListenerService() {
           val msgText = lastMessageBundle?.getCharSequence("text")
           val sender = lastMessageBundle?.getCharSequence("sender")
           if (!msgText.isNullOrBlank()) {
-            textCharSequence = if (!sender.isNullOrBlank()) "$sender: $msgText" else msgText
+            textCharSequence = if (!sender.isNullOrBlank() && titleCharSequence?.contains(sender, ignoreCase = true) == false) {
+              "$sender: $msgText"
+            } else {
+              msgText
+            }
           }
         }
       } catch (ignored: Exception) {
         // Fallback safely if parcelable casting varies by OS
+      }
+    }
+
+    // For messaging apps like WhatsApp that bundle multiple messages as EXTRA_TEXT_LINES (InboxStyle)
+    if ((textCharSequence.isNullOrBlank() || isSummaryText(textCharSequence?.toString())) && extras != null) {
+      val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+      if (!textLines.isNullOrEmpty()) {
+        val lastLine = textLines.lastOrNull { !it.isNullOrBlank() }
+        if (!lastLine.isNullOrBlank()) {
+          textCharSequence = lastLine
+        }
       }
     }
 
@@ -141,6 +173,9 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       text = "Notification alert received"
     } else if (title.isEmpty()) {
       title = appDisplayName
+    } else if (text.isEmpty()) {
+      // For media/image/voice alerts where title is contact name but text body was empty
+      text = "Media or notification alert received"
     }
 
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
@@ -155,14 +190,10 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       notificationKey = notificationKey,
     )
 
-    // 7. Safely persist record to local database without logging sensitive text
+    // Safely persist record to local database
     serviceScope.launch {
       try {
-        val inserted = repository.insertNotification(record)
-        if (inserted) {
-          val retention = settingsRepository.getRetentionPeriod()
-          repository.purgeExpired(retention)
-        }
+        repository.insertNotification(record)
       } catch (e: Exception) {
         Log.e(TAG, "Failed to save notification record", e)
       }
@@ -189,5 +220,20 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   companion object {
     private const val TAG = "NotifTrackerListener"
+
+    @Volatile
+    var isConnected: Boolean = false
+      private set
+
+    private val SUMMARY_REGEX = Regex("""^\d+\s+(new\s+)?(messages?|alerts?|chats?|unread)""", RegexOption.IGNORE_CASE)
+
+    fun isSummaryText(text: String?): Boolean {
+      if (text.isNullOrBlank()) return false
+      val trimmed = text.trim()
+      return SUMMARY_REGEX.containsMatchIn(trimmed) ||
+        trimmed.contains("messages from", ignoreCase = true) ||
+        trimmed.equals("new message", ignoreCase = true) ||
+        trimmed.equals("new messages", ignoreCase = true)
+    }
   }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -77,6 +78,12 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+data class ConversationFolderInfo(
+  val name: String,
+  val count: Int,
+  val latestTime: Long,
+  val isGroup: Boolean,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +94,17 @@ fun AppCategoryDetailScreen(
   onNavigateBack: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  BackHandler(onBack = onNavigateBack)
+  // Selected conversation folder filter (null means viewing the list of folders)
+  var selectedConversationFolder by remember { mutableStateOf<String?>(null) }
+
+  // If inside a folder, back press returns to all folders; otherwise back returns to CategoriesScreen
+  BackHandler {
+    if (selectedConversationFolder != null) {
+      selectedConversationFolder = null
+    } else {
+      onNavigateBack()
+    }
+  }
 
   val recordsFlow = remember(packageName) {
     homeViewModel.getNotificationsForPackage(packageName)
@@ -112,9 +129,6 @@ fun AppCategoryDetailScreen(
       set(Calendar.MILLISECOND, 0)
     }.timeInMillis
   }
-
-  // Selected conversation folder filter (null means "All Chats / Folders")
-  var selectedConversationFolder by remember { mutableStateOf<String?>(null) }
 
   // Extract all distinct chat / sender / group folders with their count and latest timestamp
   val conversationFolders = remember(allRecords) {
@@ -168,12 +182,18 @@ fun AppCategoryDetailScreen(
     TopAppBar(
       navigationIcon = {
         IconButton(
-          onClick = onNavigateBack,
+          onClick = {
+            if (selectedConversationFolder != null) {
+              selectedConversationFolder = null
+            } else {
+              onNavigateBack()
+            }
+          },
           modifier = Modifier.testTag("btn_back_to_categories"),
         ) {
           Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Back to categories",
+            contentDescription = if (selectedConversationFolder != null) "Back to folders" else "Back to categories",
           )
         }
       },
@@ -182,25 +202,59 @@ fun AppCategoryDetailScreen(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          AppIconImage(
-            packageName = packageName,
-            appName = appName,
-            size = 32.dp,
-          )
-          Column {
-            Text(
-              text = appName.ifBlank { packageName },
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-              ),
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
+          if (selectedConversationFolder != null) {
+            val currentFolder = conversationFolders.find { it.name == selectedConversationFolder }
+            val isGrp = currentFolder?.isGroup == true
+            Surface(
+              shape = CircleShape,
+              color = MaterialTheme.colorScheme.primaryContainer,
+              modifier = Modifier.size(36.dp),
+            ) {
+              Box(contentAlignment = Alignment.Center) {
+                Icon(
+                  imageVector = if (isGrp) Icons.Default.Group else Icons.Default.AccountCircle,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(22.dp),
+                )
+              }
+            }
+            Column {
+              Text(
+                text = selectedConversationFolder!!,
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+              Text(
+                text = "${displayedRecords.size} alerts in $appName",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          } else {
+            AppIconImage(
+              packageName = packageName,
+              appName = appName,
+              size = 32.dp,
             )
-            Text(
-              text = "${allRecords.size} alerts recorded",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column {
+              Text(
+                text = appName.ifBlank { packageName },
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+              Text(
+                text = "${allRecords.size} alerts • ${conversationFolders.size} folders",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
           }
         }
       },
@@ -333,152 +387,132 @@ fun AppCategoryDetailScreen(
             }
           }
         }
+      }
 
-        // Horizontal Row of Chat / Contact / Group Folders
-        if (conversationFolders.size > 1) {
-          item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
+      if (selectedConversationFolder == null) {
+        // --- LEVEL 1: LIST OF FOLDERS (VERTICAL CARDS, EXACTLY LIKE CATEGORIES SCREEN) ---
+        item {
+          Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Row(
+              modifier = Modifier.padding(14.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+              )
+              Column {
                 Text(
-                  text = "Chat & Contact Folders",
-                  style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                  text = "Chat & Contact Folders (${conversationFolders.size})",
+                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                   color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (selectedConversationFolder != null) {
-                  TextButton(
-                    onClick = { selectedConversationFolder = null },
-                    modifier = Modifier.testTag("btn_clear_chat_folder"),
-                  ) {
-                    Text("Show All", fontSize = 12.sp)
-                  }
-                }
-              }
-
-              androidx.compose.foundation.lazy.LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().testTag("conversation_folders_row"),
-              ) {
-                // "All Chats" Chip
-                item {
-                  FilterChip(
-                    selected = selectedConversationFolder == null,
-                    onClick = { selectedConversationFolder = null },
-                    label = { Text("All (${allRecords.size})", fontSize = 12.sp) },
-                    leadingIcon = {
-                      Icon(
-                        imageVector = Icons.Default.Forum,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                      )
-                    },
-                    modifier = Modifier.testTag("folder_chip_all"),
-                  )
-                }
-
-                items(conversationFolders) { folder ->
-                  FilterChip(
-                    selected = selectedConversationFolder == folder.name,
-                    onClick = {
-                      selectedConversationFolder = if (selectedConversationFolder == folder.name) null else folder.name
-                    },
-                    label = { Text("${folder.name} (${folder.count})", fontSize = 12.sp) },
-                    leadingIcon = {
-                      Icon(
-                        imageVector = if (folder.isGroup) Icons.Default.Group else Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = if (selectedConversationFolder == folder.name) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                      )
-                    },
-                    modifier = Modifier.testTag("folder_chip_${folder.name.hashCode()}"),
-                  )
-                }
+                Text(
+                  text = "Tap any person or group folder to view its message history",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
               }
             }
           }
         }
-      }
 
-      if (displayedRecords.isEmpty()) {
-        item {
-          Spacer(modifier = Modifier.height(32.dp))
-          OutlinedCard(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.outlinedCardColors(
-              containerColor = MaterialTheme.colorScheme.surface,
-            ),
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("app_category_empty_card"),
-          ) {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.Center,
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(64.dp)
-                  .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                contentAlignment = Alignment.Center,
-              ) {
-                Icon(
-                  imageVector = Icons.Outlined.NotificationsNone,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                  modifier = Modifier.size(32.dp),
-                )
-              }
+        if (conversationFolders.isEmpty()) {
+          item {
+            EmptyStateCard(
+              title = if (searchQuery.isNotBlank()) "No Matching Folders" else "No Notifications Yet",
+              subtitle = if (searchQuery.isNotBlank()) "No folder matched '$searchQuery'." else "No alerts recorded for this app yet.",
+            )
+          }
+        } else {
+          val filteredFolders = if (searchQuery.isBlank()) {
+            conversationFolders
+          } else {
+            conversationFolders.filter { it.name.contains(searchQuery, ignoreCase = true) }
+          }
 
-              Spacer(modifier = Modifier.height(16.dp))
-
-              Text(
-                text = if (searchQuery.isNotBlank()) "No Matching Alerts" else "No Notifications For This App",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-              )
-
-              Spacer(modifier = Modifier.height(8.dp))
-
-              Text(
-                text = if (searchQuery.isNotBlank()) {
-                  "No saved notification matched '$searchQuery'."
-                } else {
-                  "No alerts have been captured from this app yet or all records were removed."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp,
-              )
-            }
+          items(
+            items = filteredFolders,
+            key = { it.name },
+          ) { folder ->
+            ConversationFolderCard(
+              folder = folder,
+              onClick = { selectedConversationFolder = folder.name },
+            )
           }
         }
       } else {
-        items(
-          items = displayedRecords,
-          key = { it.id },
-        ) { record ->
-          AppNotificationRecordItem(
-            record = record,
-            onDelete = { homeViewModel.deleteNotification(record.id) },
-            onToggleStar = { homeViewModel.toggleStar(record.id) },
-            onCopyOtp = { otpCode ->
-              val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-              val clip = android.content.ClipData.newPlainText("OTP Code", otpCode)
-              clipboard.setPrimaryClip(clip)
-            },
-          )
+        // --- LEVEL 2: INSIDE A SELECTED FOLDER (MESSAGES TIMELINE) ---
+        item {
+          Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Folder,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(18.dp),
+                )
+                Text(
+                  text = "Folder: ${selectedConversationFolder!!}",
+                  style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                  color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+              }
+
+              TextButton(
+                onClick = { selectedConversationFolder = null },
+                modifier = Modifier.testTag("btn_back_to_folder_list"),
+              ) {
+                Text("View All Folders", fontSize = 12.sp)
+              }
+            }
+          }
+        }
+
+        if (displayedRecords.isEmpty()) {
+          item {
+            EmptyStateCard(
+              title = if (searchQuery.isNotBlank()) "No Matching Messages" else "No Messages",
+              subtitle = if (searchQuery.isNotBlank()) "No message in this folder matched '$searchQuery'." else "This folder has no alerts.",
+            )
+          }
+        } else {
+          items(
+            items = displayedRecords,
+            key = { it.id },
+          ) { record ->
+            AppNotificationRecordItem(
+              record = record,
+              onDelete = { homeViewModel.deleteNotification(record.id) },
+              onToggleStar = { homeViewModel.toggleStar(record.id) },
+              onCopyOtp = { otpCode ->
+                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("OTP Code", otpCode)
+                clipboard.setPrimaryClip(clip)
+              },
+            )
+          }
         }
       }
-
       item {
         Spacer(modifier = Modifier.height(16.dp))
       }
@@ -666,9 +700,138 @@ private fun AppNotificationRecordItem(
   }
 }
 
-private data class ConversationFolderInfo(
-  val name: String,
-  val count: Int,
-  val latestTime: Long,
-  val isGroup: Boolean,
-)
+@Composable
+private fun ConversationFolderCard(
+  folder: ConversationFolderInfo,
+  onClick: () -> Unit,
+) {
+  OutlinedCard(
+    shape = RoundedCornerShape(16.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .testTag("conversation_folder_card_${folder.name.hashCode()}")
+      .clickable(onClick = onClick),
+    colors = CardDefaults.outlinedCardColors(
+      containerColor = MaterialTheme.colorScheme.surface,
+    ),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+      Surface(
+        shape = CircleShape,
+        color = if (folder.isGroup) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.size(44.dp),
+      ) {
+        Box(contentAlignment = Alignment.Center) {
+          Icon(
+            imageVector = if (folder.isGroup) Icons.Default.Group else Icons.Default.AccountCircle,
+            contentDescription = null,
+            tint = if (folder.isGroup) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(24.dp),
+          )
+        }
+      }
+
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = folder.name,
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.SemiBold,
+          ),
+          color = MaterialTheme.colorScheme.onSurface,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = if (folder.isGroup) "Group Chat" else "Direct Chat",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+
+      Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+      ) {
+        Text(
+          text = "${folder.count} alerts",
+          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+          color = MaterialTheme.colorScheme.onPrimaryContainer,
+          modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+      }
+
+      Icon(
+        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.size(16.dp),
+      )
+    }
+  }
+}
+
+@Composable
+private fun EmptyStateCard(
+  title: String,
+  subtitle: String,
+) {
+  Spacer(modifier = Modifier.height(24.dp))
+  OutlinedCard(
+    shape = RoundedCornerShape(20.dp),
+    colors = CardDefaults.outlinedCardColors(
+      containerColor = MaterialTheme.colorScheme.surface,
+    ),
+    modifier = Modifier
+      .fillMaxWidth()
+      .testTag("app_folder_empty_card"),
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(64.dp)
+          .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          imageVector = Icons.Outlined.NotificationsNone,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(32.dp),
+        )
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colorScheme.onSurface,
+        textAlign = TextAlign.Center,
+      )
+
+      Spacer(modifier = Modifier.height(8.dp))
+
+      Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        lineHeight = 20.sp,
+      )
+    }
+  }
+}

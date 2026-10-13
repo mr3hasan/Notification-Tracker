@@ -47,26 +47,40 @@ object NotificationAccessUtils {
   }
 
   /**
-   * On modern Android / Xiaomi devices, even after the user toggles permission ON,
-   * the Android OS sometimes does not immediately bind the NotificationListenerService.
-   * Toggling the ComponentName state nudges Android PackageManager to immediately bind the service.
+   * Rebinds the NotificationListenerService safely.
+   * If the service is already connected and active, it does nothing so that active listening is NOT interrupted.
+   * If not connected, it uses Android 7+'s official NotificationListenerService.requestRebind() API.
    */
   fun triggerServiceRebind(context: Context) {
     try {
       if (!isNotificationAccessGranted(context)) return
+
+      // If listener is already connected and processing events, do NOT disrupt it!
+      if (NotificationTrackerListenerService.isConnected) {
+        Log.d(TAG, "NotificationTrackerListenerService is already active and connected.")
+        return
+      }
+
       val component = ComponentName(context, NotificationTrackerListenerService::class.java)
-      val pm = context.packageManager
-      pm.setComponentEnabledSetting(
-        component,
-        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-        PackageManager.DONT_KILL_APP,
-      )
-      pm.setComponentEnabledSetting(
-        component,
-        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-        PackageManager.DONT_KILL_APP,
-      )
-      Log.d(TAG, "Triggered NotificationListenerService rebind.")
+
+      // Strategy 1: Official Android API (API 24+) requestRebind
+      try {
+        android.service.notification.NotificationListenerService.requestRebind(component)
+        Log.d(TAG, "Executed NotificationListenerService.requestRebind.")
+      } catch (e: Exception) {
+        Log.w(TAG, "requestRebind failed, attempting component toggle fallback", e)
+        val pm = context.packageManager
+        pm.setComponentEnabledSetting(
+          component,
+          PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+          PackageManager.DONT_KILL_APP,
+        )
+        pm.setComponentEnabledSetting(
+          component,
+          PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+          PackageManager.DONT_KILL_APP,
+        )
+      }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to rebind NotificationListenerService", e)
     }
@@ -124,6 +138,58 @@ object NotificationAccessUtils {
       false
     } catch (e: Exception) {
       Log.e(TAG, "Failed to launch settings", e)
+      false
+    }
+  }
+
+  /**
+   * Checks whether the app is whitelisted from battery optimizations.
+   */
+  fun isBatteryOptimizationIgnored(context: Context): Boolean {
+    return try {
+      val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+      powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+    } catch (e: Exception) {
+      false
+    }
+  }
+
+  /**
+   * Opens the system battery optimization settings screen so the user can ensure background collection never gets killed by OEM task killers.
+   */
+  fun openBatteryOptimizationSettings(context: Context): Boolean {
+    // Strategy 1: Direct request intent
+    try {
+      val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = android.net.Uri.parse("package:${context.packageName}")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      if (intent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(intent)
+        return true
+      }
+    } catch (ignored: Exception) {}
+
+    // Strategy 2: General battery saver settings
+    try {
+      val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      if (intent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(intent)
+        return true
+      }
+    } catch (ignored: Exception) {}
+
+    // Strategy 3: Application details settings
+    return try {
+      val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = android.net.Uri.parse("package:${context.packageName}")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      context.startActivity(intent)
+      true
+    } catch (e: Exception) {
       false
     }
   }

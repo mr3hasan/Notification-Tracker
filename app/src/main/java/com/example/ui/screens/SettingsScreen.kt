@@ -113,11 +113,15 @@ fun SettingsScreen(
   var isAccessGranted by remember {
     mutableStateOf(NotificationAccessUtils.isNotificationAccessGranted(context))
   }
+  var isBatteryIgnored by remember {
+    mutableStateOf(NotificationAccessUtils.isBatteryOptimizationIgnored(context))
+  }
 
   DisposableEffect(lifecycleOwner) {
     val observer = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {
         isAccessGranted = NotificationAccessUtils.isNotificationAccessGranted(context)
+        isBatteryIgnored = NotificationAccessUtils.isBatteryOptimizationIgnored(context)
       }
     }
     lifecycleOwner.lifecycle.addObserver(observer)
@@ -285,6 +289,92 @@ fun SettingsScreen(
                 },
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
               )
+            }
+          }
+        }
+      }
+
+      // 1b. Lock Screen & Background Protection Section
+      item {
+        OutlinedCard(
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.outlinedCardColors(
+            containerColor = if (isBatteryIgnored) {
+              MaterialTheme.colorScheme.surface
+            } else {
+              MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
+            },
+          ),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings_battery_protection_card"),
+        ) {
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(40.dp)
+                  .background(
+                    if (isBatteryIgnored) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                    CircleShape,
+                  ),
+                contentAlignment = Alignment.Center,
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Shield,
+                  contentDescription = null,
+                  tint = if (isBatteryIgnored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
+                  modifier = Modifier.size(22.dp),
+                )
+              }
+              Column(modifier = Modifier.weight(1f)) {
+                Text(
+                  text = "Lock Screen & Background Keep-Alive",
+                  style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                  color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                  text = if (isBatteryIgnored) {
+                    "Active: Android will not kill the notification listener when screen is locked or idle."
+                  } else {
+                    "Recommended: Disable battery restrictions so notifications are never missed while phone is locked."
+                  },
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+
+            if (!isBatteryIgnored) {
+              Button(
+                onClick = {
+                  NotificationAccessUtils.openBatteryOptimizationSettings(context)
+                },
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .testTag("btn_disable_battery_restrictions"),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                  containerColor = MaterialTheme.colorScheme.secondary,
+                ),
+              ) {
+                Icon(
+                  imageVector = Icons.AutoMirrored.Filled.Launch,
+                  contentDescription = null,
+                  modifier = Modifier.size(16.dp),
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                  text = "Disable Battery Restrictions",
+                  style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
+              }
             }
           }
         }

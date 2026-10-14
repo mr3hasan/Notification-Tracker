@@ -228,8 +228,9 @@ fun AppCategoryDetailScreen(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
               )
+              val cleanAppTitle = com.example.util.AppNamingUtils.getCleanAppName(packageName, appName)
               Text(
-                text = "${displayedRecords.size} alerts in $appName",
+                text = "${displayedRecords.size} alerts in $cleanAppTitle",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
@@ -242,7 +243,7 @@ fun AppCategoryDetailScreen(
             )
             Column {
               Text(
-                text = appName.ifBlank { packageName },
+                text = com.example.util.AppNamingUtils.getCleanAppName(packageName, appName),
                 style = MaterialTheme.typography.titleMedium.copy(
                   fontWeight = FontWeight.Bold,
                 ),
@@ -572,16 +573,18 @@ private fun AppNotificationRecordItem(
           if (record.isDeleted) {
             Surface(
               shape = RoundedCornerShape(6.dp),
-              color = MaterialTheme.colorScheme.errorContainer,
+              color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
             ) {
               Text(
-                text = "RECALLED",
+                text = "Recalled",
                 style = MaterialTheme.typography.labelSmall.copy(
                   fontWeight = FontWeight.Bold,
-                  fontSize = 9.sp,
+                  fontSize = 10.sp,
                 ),
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                maxLines = 1,
+                softWrap = false,
               )
             }
           }

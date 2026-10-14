@@ -511,4 +511,22 @@ class ExampleRobolectricTest {
     assertFalse(com.example.service.NotificationTrackerListenerService.isSummaryText("Hello, how are you?"))
     assertFalse(com.example.service.NotificationTrackerListenerService.isSummaryText("Your OTP is 492012"))
   }
+
+  @Test
+  fun `test AppNamingUtils transforms raw package names into clean app names`() {
+    val wa = com.example.util.AppNamingUtils.getCleanAppName("com.whatsapp", "com.whatsapp")
+    assertEquals("WhatsApp", wa)
+
+    val yt = com.example.util.AppNamingUtils.getCleanAppName("com.google.android.youtube", "")
+    assertEquals("YouTube", yt)
+
+    val fb = com.example.util.AppNamingUtils.getCleanAppName("com.facebook.orca", "com.facebook.orca")
+    assertEquals("Messenger", fb)
+
+    val sys = com.example.util.AppNamingUtils.getCleanAppName("android", "android")
+    assertEquals("Android System", sys)
+
+    val custom = com.example.util.AppNamingUtils.getCleanAppName("com.example.photo_editor_pro")
+    assertEquals("Photo Editor Pro", custom)
+  }
 }

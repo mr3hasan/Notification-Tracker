@@ -252,7 +252,7 @@ private fun AppCategoryCard(
 
       Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = appGroup.appName.ifBlank { appGroup.packageName },
+          text = com.example.util.AppNamingUtils.getCleanAppName(appGroup.packageName, appGroup.appName),
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.SemiBold,
           ),

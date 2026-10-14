@@ -82,7 +82,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     .map { list ->
       list.groupBy { it.packageName }
         .map { (pkg, records) ->
-          val appName = records.firstOrNull()?.appName?.ifBlank { pkg } ?: pkg
+          val rawName = records.firstOrNull { it.appName.isNotBlank() }?.appName
+          val appName = com.example.util.AppNamingUtils.getCleanAppName(pkg, rawName)
           val count = records.size
           val latestTime = records.maxOfOrNull { it.postTime } ?: 0L
           AppCategoryGroup(

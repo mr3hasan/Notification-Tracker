@@ -110,7 +110,8 @@ fun AnalyticsScreen(
     else {
       allNotifications.groupBy { it.packageName }
         .map { (pkg, records) ->
-          val appName = records.firstOrNull()?.appName?.ifBlank { pkg } ?: pkg
+          val rawName = records.firstOrNull { it.appName.isNotBlank() }?.appName
+          val appName = com.example.util.AppNamingUtils.getCleanAppName(pkg, rawName)
           val count = records.size
           val pct = if (totalCount > 0) (count.toFloat() / totalCount.toFloat()) else 0f
           AppInsightItem(packageName = pkg, appName = appName, count = count, percentage = pct)

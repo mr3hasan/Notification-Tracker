@@ -117,14 +117,24 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val isSummary = isSummaryText(textStr)
 
     // For modern chat apps (WhatsApp, Facebook Messenger, Telegram, Signal, Google Messages) using Notification.MessagingStyle
+    // For modern chat apps (WhatsApp, Facebook Messenger, Telegram, Signal, Google Messages) using Notification.MessagingStyle
     // When multiple messages arrive, WhatsApp sets EXTRA_TEXT to e.g. "2 new messages", while the actual latest message is in EXTRA_MESSAGES!
     if ((textCharSequence.isNullOrBlank() || isSummary) && extras != null) {
       try {
-        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-        if (!messages.isNullOrEmpty()) {
-          val lastMessageBundle = messages.lastOrNull() as? android.os.Bundle
-          val msgText = lastMessageBundle?.getCharSequence("text")
-          val sender = lastMessageBundle?.getCharSequence("sender")
+        val messagesRaw = extras.get(Notification.EXTRA_MESSAGES)
+        val messageBundles: List<android.os.Bundle> = when (messagesRaw) {
+          is Array<*> -> messagesRaw.filterIsInstance<android.os.Bundle>()
+          is List<*> -> messagesRaw.filterIsInstance<android.os.Bundle>()
+          else -> emptyList()
+        }
+        if (messageBundles.isNotEmpty()) {
+          val lastBundle = messageBundles.lastOrNull()
+          val msgText = lastBundle?.getCharSequence("text") ?: lastBundle?.getCharSequence("android.text")
+          var sender = lastBundle?.getCharSequence("sender")?.toString() ?: lastBundle?.getCharSequence("android.sender")?.toString()
+          if (sender.isNullOrBlank() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val person = lastBundle?.getParcelable<android.app.Person>("sender_person")
+            sender = person?.name?.toString()
+          }
           if (!msgText.isNullOrBlank()) {
             textCharSequence = if (!sender.isNullOrBlank() && titleCharSequence?.contains(sender, ignoreCase = true) == false) {
               "$sender: $msgText"
@@ -154,15 +164,14 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       textCharSequence = notification.tickerText
     }
 
-    // Extract display name of source app when available
-    val appDisplayName = try {
+    // Extract display name of source app using PackageManager with AppNamingUtils fallback
+    val rawLabel = try {
       val appInfo = packageManager.getApplicationInfo(sourcePackage, 0)
       packageManager.getApplicationLabel(appInfo).toString()
-    } catch (e: PackageManager.NameNotFoundException) {
-      sourcePackage
     } catch (e: Exception) {
-      sourcePackage
+      null
     }
+    val appDisplayName = com.example.util.AppNamingUtils.getCleanAppName(sourcePackage, rawLabel)
 
     var title = titleCharSequence?.toString()?.trim() ?: ""
     var text = textCharSequence?.toString()?.trim() ?: ""
@@ -208,7 +217,18 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     // Do not process internal notifications
     if (sourcePackage == packageName) return
 
-    // Mark notification in DB as deleted/recalled by sender or dismissed
+    // Avoid false "Recalled" status on system, utility, or ongoing notifications
+    if (sourcePackage == "android" ||
+      sourcePackage.startsWith("com.android.systemui") ||
+      sourcePackage.startsWith("com.miui.system") ||
+      sourcePackage.contains("inputmethod") ||
+      sourcePackage.contains("keyboard") ||
+      sbn.isOngoing
+    ) {
+      return
+    }
+
+    // Mark notification in DB as deleted/recalled by sender
     serviceScope.launch {
       try {
         repository.markAsDeletedByKey(key, System.currentTimeMillis())

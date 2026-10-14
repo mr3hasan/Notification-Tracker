@@ -555,31 +555,34 @@ private fun NotificationRecordItemCard(
             size = 32.dp,
           )
 
-          Column {
+          Column(modifier = Modifier.weight(1f, fill = false)) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
               Text(
-                text = record.appName.ifBlank { record.packageName },
+                text = com.example.util.AppNamingUtils.getCleanAppName(record.packageName, record.appName),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
               )
               if (record.isDeleted) {
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = MaterialTheme.colorScheme.errorContainer,
+                  color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
                 ) {
                   Text(
-                    text = "RECALLED / DELETED",
+                    text = "Recalled",
                     style = MaterialTheme.typography.labelSmall.copy(
                       fontWeight = FontWeight.Bold,
-                      fontSize = 9.sp,
+                      fontSize = 10.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    maxLines = 1,
+                    softWrap = false,
                   )
                 }
               }

@@ -32,15 +32,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     repository = NotificationRepository(db.notificationDao())
     settingsRepository = SettingsRepository.getInstance(application)
 
-    // Automatically purge expired notifications on startup based on configured retention period
+    // Automatically purge expired notifications ONLY if user has set a finite retention period (never purge FOREVER)
     viewModelScope.launch {
-      repository.purgeExpired(settingsRepository.getRetentionPeriod())
+      val period = settingsRepository.getRetentionPeriod()
+      if (period != RetentionPeriod.FOREVER) {
+        repository.purgeExpired(period)
+      }
     }
   }
 
   val isCollectionPaused: StateFlow<Boolean> = settingsRepository.isCollectionPaused
   val excludedPackages: StateFlow<Set<String>> = settingsRepository.excludedPackages
   val retentionPeriod: StateFlow<RetentionPeriod> = settingsRepository.retentionPeriod
+  val isAppLockEnabled: StateFlow<Boolean> = settingsRepository.isAppLockEnabled
+
+  fun setAppLockEnabled(enabled: Boolean) {
+    settingsRepository.setAppLockEnabled(enabled)
+  }
 
   val notifications: StateFlow<List<NotificationRecord>> = repository.allNotifications
     .stateIn(

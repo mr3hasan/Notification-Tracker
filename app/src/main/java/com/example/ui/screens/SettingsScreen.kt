@@ -134,6 +134,7 @@ fun SettingsScreen(
   val isPaused by homeViewModel.isCollectionPaused.collectAsStateWithLifecycle()
   val excludedPackages by homeViewModel.excludedPackages.collectAsStateWithLifecycle()
   val retentionPeriod by homeViewModel.retentionPeriod.collectAsStateWithLifecycle()
+  val isAppLockEnabled by homeViewModel.isAppLockEnabled.collectAsStateWithLifecycle()
   val totalNotificationCount by homeViewModel.totalCount.collectAsStateWithLifecycle()
   val appCategories by homeViewModel.appCategories.collectAsStateWithLifecycle()
 
@@ -645,6 +646,128 @@ fun SettingsScreen(
                   },
                   modifier = Modifier.testTag("retention_chip_${option.days}"),
                 )
+              }
+            }
+          }
+        }
+      }
+
+      // Security & Biometric Lock Section
+      item {
+        SettingsSectionHeader(title = "Security & App Lock")
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedCard(
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+          ),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f),
+              ) {
+                Box(
+                  modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                      if (isAppLockEnabled) MaterialTheme.colorScheme.primaryContainer
+                      else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                  contentAlignment = Alignment.Center,
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = if (isAppLockEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                  )
+                }
+
+                Column {
+                  Text(
+                    text = "Fingerprint / Security Lock",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                  )
+                  Text(
+                    text = if (isAppLockEnabled) "App requires fingerprint or PIN to open" else "Security lock is currently off",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp,
+                  )
+                }
+              }
+
+              Switch(
+                checked = isAppLockEnabled,
+                onCheckedChange = { isEnabled ->
+                  homeViewModel.setAppLockEnabled(isEnabled)
+                  coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                      if (isEnabled) "Fingerprint / PIN Lock activated." else "App Lock disabled."
+                    )
+                  }
+                },
+              )
+            }
+          }
+        }
+      }
+
+      // Xiaomi / HyperOS Background Stability Section (Visible on Xiaomi devices)
+      if (com.example.util.XiaomiOptimizationHelper.isXiaomiDevice()) {
+        item {
+          SettingsSectionHeader(title = "Xiaomi / HyperOS Background Setup")
+          Spacer(modifier = Modifier.height(6.dp))
+          OutlinedCard(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.outlinedCardColors(
+              containerColor = MaterialTheme.colorScheme.surface,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Column(
+              modifier = Modifier.padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Text(
+                text = "শাওমি ফোনে কোনো নোটিফিকেশন মিস না হওয়ার জন্য 'Autostart' চালু করুন এবং ব্যাটারি সেভারে 'No restrictions' দিন।",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp,
+              )
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+              ) {
+                Button(
+                  onClick = { com.example.util.XiaomiOptimizationHelper.openAutostartSettings(context) },
+                  modifier = Modifier.weight(1f),
+                  shape = RoundedCornerShape(10.dp),
+                ) {
+                  Text("Autostart Settings", fontSize = 11.sp)
+                }
+                Button(
+                  onClick = { com.example.util.XiaomiOptimizationHelper.openNoRestrictionsBatterySettings(context) },
+                  modifier = Modifier.weight(1f),
+                  shape = RoundedCornerShape(10.dp),
+                  colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                ) {
+                  Text("No Restrictions", fontSize = 11.sp)
+                }
               }
             }
           }

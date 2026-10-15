@@ -187,6 +187,9 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       text = "Media or notification alert received"
     }
 
+    // Check if the incoming alert is explicitly flagged as a deleted/recalled message
+    val isDeletedMessage = isMessageRecalledText(text) || isMessageRecalledText(title)
+
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
     val notificationKey = sbn.key ?: ""
 
@@ -197,6 +200,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       content = text,
       postTime = postTime,
       notificationKey = notificationKey,
+      isDeleted = isDeletedMessage,
     )
 
     // Safely persist record to local database
@@ -209,7 +213,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     }
   }
 
-  override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+  override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
     if (sbn == null) return
     val key = sbn.key ?: return
     val sourcePackage = sbn.packageName ?: return
@@ -217,7 +221,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     // Do not process internal notifications
     if (sourcePackage == packageName) return
 
-    // Avoid false "Recalled" status on system, utility, or ongoing notifications
+    // Avoid false "Recalled" status on system or keyboard alerts
     if (sourcePackage == "android" ||
       sourcePackage.startsWith("com.android.systemui") ||
       sourcePackage.startsWith("com.miui.system") ||
@@ -228,14 +232,28 @@ class NotificationTrackerListenerService : NotificationListenerService() {
       return
     }
 
-    // Mark notification in DB as deleted/recalled by sender
-    serviceScope.launch {
-      try {
-        repository.markAsDeletedByKey(key, System.currentTimeMillis())
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to mark notification as deleted for key: $key", e)
+    // CRITICAL FIX: Only flag as recalled if the sending APP retracted it (REASON_APP_CANCEL = 1)
+    // Never flag if the user simply swiped/dismissed it (REASON_CANCEL = 2, REASON_CLICK = 3)
+    val isAppRetracted = reason == REASON_APP_CANCEL
+    val isChatApp = sourcePackage.contains("whatsapp") ||
+      sourcePackage.contains("telegram") ||
+      sourcePackage.contains("signal") ||
+      sourcePackage.contains("orca") ||
+      sourcePackage.contains("facebook")
+
+    if (isAppRetracted && isChatApp) {
+      serviceScope.launch {
+        try {
+          repository.markAsDeletedByKey(key, System.currentTimeMillis())
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to mark notification as retracted for key: $key", e)
+        }
       }
     }
+  }
+
+  override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+    super.onNotificationRemoved(sbn)
   }
 
   companion object {
@@ -244,6 +262,17 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     @Volatile
     var isConnected: Boolean = false
       private set
+
+    fun isMessageRecalledText(text: String?): Boolean {
+      if (text.isNullOrBlank()) return false
+      val lower = text.lowercase(java.util.Locale.ROOT)
+      return lower.contains("this message was deleted") ||
+        lower.contains("message was deleted") ||
+        lower.contains("ডিলিট করা হয়েছে") ||
+        lower.contains("মুছে ফেলা হয়েছে") ||
+        lower.contains("message was retracted") ||
+        lower.contains("this message was removed")
+    }
 
     private val SUMMARY_REGEX = Regex("""^\d+\s+(new\s+)?(messages?|alerts?|chats?|unread)""", RegexOption.IGNORE_CASE)
 

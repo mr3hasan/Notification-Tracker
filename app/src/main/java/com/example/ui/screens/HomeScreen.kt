@@ -186,6 +186,11 @@ fun HomeScreen(
       }
 
       item {
+        // Xiaomi / HyperOS background preservation card
+        XiaomiAutostartCard()
+      }
+
+      item {
         // Section header
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -503,6 +508,91 @@ private fun AccessPendingBanner(
           shape = RoundedCornerShape(10.dp),
         ) {
           Text("Grant Notification Access in Android Settings")
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun XiaomiAutostartCard() {
+  val context = LocalContext.current
+  var isDismissed by remember { mutableStateOf(false) }
+
+  if (isDismissed || !com.example.util.XiaomiOptimizationHelper.isXiaomiDevice()) {
+    return
+  }
+
+  ElevatedCard(
+    shape = RoundedCornerShape(16.dp),
+    colors = CardDefaults.elevatedCardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceVariant,
+    ),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(
+      modifier = Modifier.padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Icon(
+            imageVector = Icons.Default.Security,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+          )
+          Text(
+            text = "Xiaomi / HyperOS ব্যাকগ্রাউন্ড সেটআপ",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        IconButton(
+          onClick = { isDismissed = true },
+          modifier = Modifier.size(24.dp),
+        ) {
+          Icon(
+            imageVector = Icons.Default.Delete,
+            contentDescription = "Dismiss",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+          )
+        }
+      }
+
+      Text(
+        text = "শাওমি ফোনে কোনো নোটিফিকেশন যাতে মিস না হয় সেজন্য 'Autostart' অন করুন এবং ব্যাটারি সেভার 'No restrictions' দিন।",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+        lineHeight = 18.sp,
+      )
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        Button(
+          onClick = { com.example.util.XiaomiOptimizationHelper.openAutostartSettings(context) },
+          modifier = Modifier.weight(1f),
+          shape = RoundedCornerShape(10.dp),
+        ) {
+          Text("Autostart অন করুন", fontSize = 12.sp)
+        }
+        Button(
+          onClick = { com.example.util.XiaomiOptimizationHelper.openNoRestrictionsBatterySettings(context) },
+          modifier = Modifier.weight(1f),
+          shape = RoundedCornerShape(10.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+        ) {
+          Text("No Restrictions", fontSize = 12.sp)
         }
       }
     }

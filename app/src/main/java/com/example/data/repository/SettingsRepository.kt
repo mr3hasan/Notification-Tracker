@@ -45,6 +45,18 @@ class SettingsRepository(context: Context) {
   )
   val retentionPeriod: StateFlow<RetentionPeriod> = _retentionPeriod.asStateFlow()
 
+  private val _isAppLockEnabled = MutableStateFlow(
+    prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
+  )
+  val isAppLockEnabled: StateFlow<Boolean> = _isAppLockEnabled.asStateFlow()
+
+  fun isAppLockEnabled(): Boolean = prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
+
+  fun setAppLockEnabled(enabled: Boolean) {
+    prefs.edit().putBoolean(KEY_APP_LOCK_ENABLED, enabled).apply()
+    _isAppLockEnabled.value = enabled
+  }
+
   /**
    * Synchronous check used by NotificationTrackerListenerService before saving an alert.
    */
@@ -102,6 +114,7 @@ class SettingsRepository(context: Context) {
     const val KEY_COLLECTION_PAUSED = "key_collection_paused"
     const val KEY_EXCLUDED_PACKAGES = "key_excluded_packages"
     const val KEY_RETENTION_DAYS = "key_retention_days"
+    const val KEY_APP_LOCK_ENABLED = "key_app_lock_enabled"
 
     @Volatile
     private var INSTANCE: SettingsRepository? = null

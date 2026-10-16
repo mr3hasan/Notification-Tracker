@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.ui.navigation.NavDestination
 import com.example.ui.screens.CategoriesScreen
 import com.example.ui.screens.HomeScreen

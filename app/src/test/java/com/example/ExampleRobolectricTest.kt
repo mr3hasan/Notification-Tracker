@@ -490,13 +490,13 @@ class ExampleRobolectricTest {
     val insertedDup = repository.insertNotification(duplicateRepost)
     assertFalse(insertedDup)
 
-    // Legitimate consecutive message arriving 4 seconds later -> accepted
+    // Legitimate consecutive message arriving after deduplication window -> accepted
     val consecutiveMsg = NotificationRecord(
       packageName = "com.chat",
       appName = "Chat App",
       title = "Friend",
       content = "Yes",
-      postTime = t0 + 4000L,
+      postTime = t0 + 65_000L,
     )
     val insertedConsecutive = repository.insertNotification(consecutiveMsg)
     assertTrue(insertedConsecutive)

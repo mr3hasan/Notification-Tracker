@@ -53,7 +53,12 @@ fun NotificationTrackerApp(
               )
             },
             label = {
-              Text(text = destination.label)
+              Text(
+                text = destination.label,
+                maxLines = 1,
+                softWrap = false,
+                fontSize = 11.sp,
+              )
             },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,

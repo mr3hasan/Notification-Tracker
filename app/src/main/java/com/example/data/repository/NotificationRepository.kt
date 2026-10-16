@@ -25,13 +25,13 @@ class NotificationRepository(private val notificationDao: NotificationDao) {
 
   suspend fun insertNotification(record: NotificationRecord): Boolean {
     // Exact match deduplication:
-    // Drop ONLY if exact same package, title, and content arrived within 800ms (to prevent rapid duplicates only)
-    // Legitimate consecutive messages (even 1 second apart) will be safely preserved.
+    // Drop if exact same package, title, and content arrived within 60 seconds (60000ms)
+    // This eliminates redundant OS/app status-bar re-posts of the same message (e.g. 3x at 09:08).
     val recent = notificationDao.findRecentNotification(
       packageName = record.packageName,
       title = record.title,
       content = record.content,
-      minPostTime = record.postTime - 800L,
+      minPostTime = record.postTime - 60000L,
     )
     if (recent != null) {
       return false

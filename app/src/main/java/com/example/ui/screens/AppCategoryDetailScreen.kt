@@ -518,6 +518,60 @@ fun AppCategoryDetailScreen(
         Spacer(modifier = Modifier.height(16.dp))
       }
     }
+
+    if (showClearAppDialog) {
+      AlertDialog(
+        onDismissRequest = { showClearAppDialog = false },
+        icon = {
+          Icon(
+            imageVector = Icons.Default.Delete,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+          )
+        },
+        title = {
+          Text(
+            if (selectedConversationFolder != null)
+              "Delete all in \"$selectedConversationFolder\"?"
+            else
+              "Clear all alerts for $appName?"
+          )
+        },
+        text = {
+          Text(
+            if (selectedConversationFolder != null)
+              "This will delete all ${displayedRecords.size} notifications from this conversation."
+            else
+              "This will delete all ${allRecords.size} stored notifications from $appName."
+          )
+        },
+        confirmButton = {
+          Button(
+            onClick = {
+              showClearAppDialog = false
+              if (selectedConversationFolder != null) {
+                displayedRecords.forEach { record ->
+                  homeViewModel.deleteNotification(record.id)
+                }
+                selectedConversationFolder = null
+              } else {
+                homeViewModel.deleteNotificationsForPackage(packageName)
+              }
+            },
+            colors = ButtonDefaults.buttonColors(
+              containerColor = MaterialTheme.colorScheme.error,
+            ),
+          ) {
+            Text("Delete All")
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = { showClearAppDialog = false }) {
+            Text("Cancel")
+          }
+        },
+      )
+    }
   }
 }
 

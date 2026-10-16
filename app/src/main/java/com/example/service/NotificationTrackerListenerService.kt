@@ -193,6 +193,16 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
     val notificationKey = sbn.key ?: ""
 
+    // Deduplication check: drop duplicate notifications within 60 seconds (prevents same message logged 3x at 09:08)
+    val now = System.currentTimeMillis()
+    val dedupKey = "$sourcePackage|$title|$text"
+    val lastSeen = recentNotificationTimestamps[dedupKey]
+    if (lastSeen != null && (now - lastSeen) < 60_000L) {
+      Log.d(TAG, "Deduplication: Skipped duplicate alert within 60s from $sourcePackage: $title")
+      return
+    }
+    recentNotificationTimestamps[dedupKey] = now
+
     val record = NotificationRecord(
       packageName = sourcePackage,
       appName = appDisplayName,
@@ -214,42 +224,9 @@ class NotificationTrackerListenerService : NotificationListenerService() {
   }
 
   override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
-    if (sbn == null) return
-    val key = sbn.key ?: return
-    val sourcePackage = sbn.packageName ?: return
-
-    // Do not process internal notifications
-    if (sourcePackage == packageName) return
-
-    // Avoid false "Recalled" status on system or keyboard alerts
-    if (sourcePackage == "android" ||
-      sourcePackage.startsWith("com.android.systemui") ||
-      sourcePackage.startsWith("com.miui.system") ||
-      sourcePackage.contains("inputmethod") ||
-      sourcePackage.contains("keyboard") ||
-      sbn.isOngoing
-    ) {
-      return
-    }
-
-    // CRITICAL FIX: Only flag as recalled if the sending APP retracted it (REASON_APP_CANCEL = 1)
-    // Never flag if the user simply swiped/dismissed it (REASON_CANCEL = 2, REASON_CLICK = 3)
-    val isAppRetracted = reason == REASON_APP_CANCEL
-    val isChatApp = sourcePackage.contains("whatsapp") ||
-      sourcePackage.contains("telegram") ||
-      sourcePackage.contains("signal") ||
-      sourcePackage.contains("orca") ||
-      sourcePackage.contains("facebook")
-
-    if (isAppRetracted && isChatApp) {
-      serviceScope.launch {
-        try {
-          repository.markAsDeletedByKey(key, System.currentTimeMillis())
-        } catch (e: Exception) {
-          Log.e(TAG, "Failed to mark notification as retracted for key: $key", e)
-        }
-      }
-    }
+    // No-op: Do not mark notifications as recalled on removal because WhatsApp cancels
+    // notifications when user opens chat or posts group updates.
+    // Real retracted messages are detected directly via isMessageRecalledText.
   }
 
   override fun onNotificationRemoved(sbn: StatusBarNotification?) {
@@ -258,6 +235,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   companion object {
     private const val TAG = "NotifTrackerListener"
+    private val recentNotificationTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     @Volatile
     var isConnected: Boolean = false

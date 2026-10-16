@@ -180,14 +180,10 @@ fun HomeScreen(
         )
       }
 
-      item {
-        // Notification Access status notice banner
-        AccessPendingBanner(isAccessGranted = isAccessGranted)
-      }
-
-      item {
-        // Xiaomi / HyperOS background preservation card
-        XiaomiAutostartCard()
+        // If access is not granted yet, show prompt; once active, keep Home screen clean
+        if (!isAccessGranted) {
+          AccessPendingBanner(isAccessGranted = false)
+        }
       }
 
       item {

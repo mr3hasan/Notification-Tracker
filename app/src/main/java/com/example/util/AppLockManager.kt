@@ -119,7 +119,7 @@ object AppLockManager {
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
               super.onAuthenticationError(errorCode, errString)
               Log.w(TAG, "Biometric error: $errString (code: $errorCode)")
-              if (errorCode == BiometricPrompt.BIOMETRIC_ERROR_NEGATIVE_BUTTON) {
+              if (errorCode == 13 || errorCode == BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED) {
                 onFallbackToDeviceCredential()
               } else if (errorCode == BiometricPrompt.BIOMETRIC_ERROR_LOCKOUT ||
                          errorCode == BiometricPrompt.BIOMETRIC_ERROR_LOCKOUT_PERMANENT ||

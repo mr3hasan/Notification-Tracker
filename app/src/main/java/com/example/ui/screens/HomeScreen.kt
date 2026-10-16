@@ -180,8 +180,9 @@ fun HomeScreen(
         )
       }
 
-        // If access is not granted yet, show prompt; once active, keep Home screen clean
-        if (!isAccessGranted) {
+      // If access is not granted yet, show prompt; once active, keep Home screen clean
+      if (!isAccessGranted) {
+        item {
           AccessPendingBanner(isAccessGranted = false)
         }
       }

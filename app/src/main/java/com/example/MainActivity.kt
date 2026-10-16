@@ -26,7 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -228,7 +228,7 @@ fun AppLockScreen(
         contentPadding = PaddingValues(vertical = 13.dp)
       ) {
         Icon(
-          imageVector = Icons.Default.Pin,
+          imageVector = Icons.Default.Key,
           contentDescription = null,
           modifier = Modifier.size(20.dp)
         )

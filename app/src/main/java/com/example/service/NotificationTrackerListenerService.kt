@@ -1,7 +1,8 @@
 package com.example.service
 
 import android.app.Notification
-import android.content.pm.PackageManager
+import android.content.Intent
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -9,12 +10,12 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.NotificationRecord
 import com.example.data.repository.NotificationRepository
 import com.example.data.repository.SettingsRepository
-import com.example.util.NotificationAccessUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Service to intercept and locally record incoming notification events.
@@ -32,6 +33,11 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     settingsRepository = SettingsRepository.getInstance(applicationContext)
   }
 
+  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    super.onStartCommand(intent, flags, startId)
+    return START_STICKY
+  }
+
   override fun onDestroy() {
     super.onDestroy()
     serviceScope.cancel()
@@ -41,6 +47,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     super.onListenerConnected()
     isConnected = true
     Log.d(TAG, "Notification listener connected.")
+
     // Instantly capture any active notifications currently sitting in the status bar
     try {
       val activeSbns = activeNotifications
@@ -75,8 +82,15 @@ class NotificationTrackerListenerService : NotificationListenerService() {
   }
 
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
-    if (sbn == null) return
+    try {
+      processNotificationPosted(sbn)
+    } catch (t: Throwable) {
+      Log.e(TAG, "Unhandled error in onNotificationPosted", t)
+    }
+  }
 
+  private fun processNotificationPosted(sbn: StatusBarNotification?) {
+    if (sbn == null) return
     val sourcePackage = sbn.packageName ?: return
 
     // 1. Ignore notifications posted by Notification Tracker itself to prevent loops
@@ -117,7 +131,6 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val isSummary = isSummaryText(textStr)
 
     // For modern chat apps (WhatsApp, Facebook Messenger, Telegram, Signal, Google Messages) using Notification.MessagingStyle
-    // For modern chat apps (WhatsApp, Facebook Messenger, Telegram, Signal, Google Messages) using Notification.MessagingStyle
     // When multiple messages arrive, WhatsApp sets EXTRA_TEXT to e.g. "2 new messages", while the actual latest message is in EXTRA_MESSAGES!
     if ((textCharSequence.isNullOrBlank() || isSummary) && extras != null) {
       try {
@@ -131,7 +144,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
           val lastBundle = messageBundles.lastOrNull()
           val msgText = lastBundle?.getCharSequence("text") ?: lastBundle?.getCharSequence("android.text")
           var sender = lastBundle?.getCharSequence("sender")?.toString() ?: lastBundle?.getCharSequence("android.sender")?.toString()
-          if (sender.isNullOrBlank() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+          if (sender.isNullOrBlank() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val person = lastBundle?.getParcelable<android.app.Person>("sender_person")
             sender = person?.name?.toString()
           }
@@ -173,19 +186,22 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     }
     val appDisplayName = com.example.util.AppNamingUtils.getCleanAppName(sourcePackage, rawLabel)
 
-    var title = titleCharSequence?.toString()?.trim() ?: ""
+    var rawTitle = titleCharSequence?.toString()?.trim() ?: ""
     var text = textCharSequence?.toString()?.trim() ?: ""
 
     // Never drop any notification: if both are blank, use app name and alert placeholder
-    if (title.isEmpty() && text.isEmpty()) {
-      title = appDisplayName
+    if (rawTitle.isEmpty() && text.isEmpty()) {
+      rawTitle = appDisplayName
       text = "Notification alert received"
-    } else if (title.isEmpty()) {
-      title = appDisplayName
+    } else if (rawTitle.isEmpty()) {
+      rawTitle = appDisplayName
     } else if (text.isEmpty()) {
       // For media/image/voice alerts where title is contact name but text body was empty
       text = "Media or notification alert received"
     }
+
+    // Clean dynamic counters like (8 messages) from group titles
+    val title = cleanNotificationTitle(rawTitle)
 
     // Check if the incoming alert is explicitly flagged as a deleted/recalled message
     val isDeletedMessage = isMessageRecalledText(text) || isMessageRecalledText(title)
@@ -193,18 +209,24 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
     val notificationKey = sbn.key ?: ""
 
-    // Deduplication check: drop rapid burst duplicates arriving within 1.5 seconds (1500ms)
-    // This stops the OS from logging the same notification 3 times at the same millisecond/second (e.g. at 09:08),
-    // while NEVER dropping legitimate notifications or messages arriving even a couple of seconds later.
+    // In-memory rapid deduplication check (safely iterate without ConcurrentHashMap.removeIf)
     val now = System.currentTimeMillis()
     try {
-      recentNotificationTimestamps.entries.removeIf { (now - it.value) > 10_000L }
-    } catch (ignored: Exception) {}
+      val iterator = recentNotificationTimestamps.entries.iterator()
+      while (iterator.hasNext()) {
+        val entry = iterator.next()
+        if (now - entry.value > 60_000L) {
+          iterator.remove()
+        }
+      }
+    } catch (t: Throwable) {
+      Log.w(TAG, "Error pruning timestamp map", t)
+    }
 
     val dedupKey = "$sourcePackage|$title|$text"
     val lastSeen = recentNotificationTimestamps[dedupKey]
-    if (lastSeen != null && (now - lastSeen) < 1500L) {
-      Log.d(TAG, "Deduplication: Skipped rapid burst duplicate within 1.5s from $sourcePackage: $title")
+    if (lastSeen != null && (now - lastSeen) < 5000L) {
+      Log.d(TAG, "Deduplication: Skipped rapid burst duplicate within 5s from $sourcePackage: $title")
       return
     }
     recentNotificationTimestamps[dedupKey] = now
@@ -241,7 +263,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   companion object {
     private const val TAG = "NotifTrackerListener"
-    private val recentNotificationTimestamps = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val recentNotificationTimestamps = ConcurrentHashMap<String, Long>()
 
     @Volatile
     var isConnected: Boolean = false
@@ -256,6 +278,15 @@ class NotificationTrackerListenerService : NotificationListenerService() {
         lower.contains("মুছে ফেলা হয়েছে") ||
         lower.contains("message was retracted") ||
         lower.contains("this message was removed")
+    }
+
+    fun cleanNotificationTitle(rawTitle: String): String {
+      if (rawTitle.isBlank()) return rawTitle
+      return rawTitle
+        .replace(Regex("""\s*\(\d+\s+(?:new\s+)?messages?\):?""", RegexOption.IGNORE_CASE), ":")
+        .replace(Regex("""\s*:\s*:""", RegexOption.IGNORE_CASE), ":")
+        .replace(Regex("""\s+""", RegexOption.IGNORE_CASE), " ")
+        .trim()
     }
 
     private val SUMMARY_REGEX = Regex("""^\d+\s+(new\s+)?(messages?|alerts?|chats?|unread)""", RegexOption.IGNORE_CASE)

@@ -44,6 +44,19 @@ interface NotificationDao {
 
   @Query(
     """
+    SELECT * FROM notifications 
+    WHERE notification_key = :notificationKey 
+      AND content = :content 
+    LIMIT 1
+    """,
+  )
+  suspend fun findByKeyAndContent(
+    notificationKey: String,
+    content: String,
+  ): NotificationRecord?
+
+  @Query(
+    """
     SELECT COUNT(*) FROM notifications 
     WHERE package_name = :packageName 
       AND title = :title 

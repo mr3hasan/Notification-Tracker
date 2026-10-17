@@ -54,28 +54,28 @@ object NotificationAccessUtils {
   fun triggerServiceRebind(context: Context) {
     try {
       if (!isNotificationAccessGranted(context)) return
-
-      // Always request rebind to ensure MIUI / HyperOS keeps the notification channel active
-
       val component = ComponentName(context, NotificationTrackerListenerService::class.java)
-
-      // Strategy 1: Official Android API (API 24+) requestRebind
       try {
         android.service.notification.NotificationListenerService.requestRebind(component)
         Log.d(TAG, "Executed NotificationListenerService.requestRebind.")
       } catch (e: Exception) {
-        Log.w(TAG, "requestRebind failed, attempting component toggle fallback", e)
-        val pm = context.packageManager
-        pm.setComponentEnabledSetting(
-          component,
-          PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-          PackageManager.DONT_KILL_APP,
-        )
-        pm.setComponentEnabledSetting(
-          component,
-          PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-          PackageManager.DONT_KILL_APP,
-        )
+        Log.w(TAG, "requestRebind failed", e)
+      }
+      if (!NotificationTrackerListenerService.isConnected) {
+        try {
+          val pm = context.packageManager
+          pm.setComponentEnabledSetting(
+            component,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP,
+          )
+          pm.setComponentEnabledSetting(
+            component,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP,
+          )
+          Log.d(TAG, "Revived NotificationListenerService component.")
+        } catch (ignored: Exception) {}
       }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to rebind NotificationListenerService", e)

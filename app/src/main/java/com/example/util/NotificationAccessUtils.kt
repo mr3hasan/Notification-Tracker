@@ -55,11 +55,7 @@ object NotificationAccessUtils {
     try {
       if (!isNotificationAccessGranted(context)) return
 
-      // If listener is already connected and processing events, do NOT disrupt it!
-      if (NotificationTrackerListenerService.isConnected) {
-        Log.d(TAG, "NotificationTrackerListenerService is already active and connected.")
-        return
-      }
+      // Always request rebind to ensure MIUI / HyperOS keeps the notification channel active
 
       val component = ComponentName(context, NotificationTrackerListenerService::class.java)
 

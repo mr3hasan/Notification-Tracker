@@ -6,11 +6,8 @@ import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
 class NotificationRepository(private val notificationDao: NotificationDao) {
-
   val allNotifications: Flow<List<NotificationRecord>> = notificationDao.getAllNotifications()
-
   val totalCount: Flow<Int> = notificationDao.getTotalCount()
-
   val distinctAppCount: Flow<Int> = notificationDao.getDistinctAppCount()
 
   fun getTodayCount(): Flow<Int> {
@@ -25,18 +22,19 @@ class NotificationRepository(private val notificationDao: NotificationDao) {
 
   suspend fun insertNotification(record: NotificationRecord): Boolean {
     // Exact match deduplication:
-    // Drop if exact same package, title, and content arrived within 60 seconds (60000ms)
-    // This eliminates redundant OS/app status-bar re-posts of the same message (e.g. 3x at 09:08).
+    // Drop ONLY if exact same package, title, and content arrived within 1500ms (1.5 seconds).
+    // This eliminates redundant OS/app status-bar re-posts of the same message (e.g. 3x at 09:08),
+    // while NEVER dropping legitimate messages or notifications arriving even seconds later.
     val recent = notificationDao.findRecentNotification(
       packageName = record.packageName,
       title = record.title,
       content = record.content,
-      minPostTime = record.postTime - 60000L,
+      minPostTime = record.postTime - 1500L,
+      maxPostTime = record.postTime + 1500L,
     )
     if (recent != null) {
       return false
     }
-
     notificationDao.insert(record)
     return true
   }

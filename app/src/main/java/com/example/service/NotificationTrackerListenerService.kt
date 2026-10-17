@@ -193,12 +193,18 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
     val notificationKey = sbn.key ?: ""
 
-    // Deduplication check: drop duplicate notifications within 60 seconds (prevents same message logged 3x at 09:08)
+    // Deduplication check: drop rapid burst duplicates arriving within 1.5 seconds (1500ms)
+    // This stops the OS from logging the same notification 3 times at the same millisecond/second (e.g. at 09:08),
+    // while NEVER dropping legitimate notifications or messages arriving even a couple of seconds later.
     val now = System.currentTimeMillis()
+    try {
+      recentNotificationTimestamps.entries.removeIf { (now - it.value) > 10_000L }
+    } catch (ignored: Exception) {}
+
     val dedupKey = "$sourcePackage|$title|$text"
     val lastSeen = recentNotificationTimestamps[dedupKey]
-    if (lastSeen != null && (now - lastSeen) < 60_000L) {
-      Log.d(TAG, "Deduplication: Skipped duplicate alert within 60s from $sourcePackage: $title")
+    if (lastSeen != null && (now - lastSeen) < 1500L) {
+      Log.d(TAG, "Deduplication: Skipped rapid burst duplicate within 1.5s from $sourcePackage: $title")
       return
     }
     recentNotificationTimestamps[dedupKey] = now

@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NotificationDao {
-
   @Query("SELECT * FROM notifications ORDER BY post_time DESC")
   fun getAllNotifications(): Flow<List<NotificationRecord>>
 
@@ -31,6 +30,7 @@ interface NotificationDao {
       AND title = :title 
       AND content = :content 
       AND post_time >= :minPostTime
+      AND post_time <= :maxPostTime
     LIMIT 1
     """,
   )
@@ -39,6 +39,7 @@ interface NotificationDao {
     title: String,
     content: String,
     minPostTime: Long,
+    maxPostTime: Long,
   ): NotificationRecord?
 
   @Query(
@@ -48,6 +49,7 @@ interface NotificationDao {
       AND title = :title 
       AND content = :content 
       AND post_time >= :minPostTime
+      AND post_time <= :maxPostTime
     """,
   )
   suspend fun countRecentDuplicates(
@@ -55,6 +57,7 @@ interface NotificationDao {
     title: String,
     content: String,
     minPostTime: Long,
+    maxPostTime: Long,
   ): Int
 
   @Query("SELECT * FROM notifications WHERE package_name = :packageName ORDER BY post_time DESC")

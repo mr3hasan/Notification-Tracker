@@ -1,11 +1,18 @@
 package com.example.service
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.example.MainActivity
+import com.example.R
 import com.example.data.local.AppDatabase
 import com.example.data.local.NotificationRecord
 import com.example.data.repository.NotificationRepository
@@ -19,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Service to intercept and locally record incoming notification events.
+ * Runs with Foreground Service protection to ensure 24/7 background uptime on Xiaomi / MIUI / HyperOS.
  */
 class NotificationTrackerListenerService : NotificationListenerService() {
 
@@ -31,11 +39,67 @@ class NotificationTrackerListenerService : NotificationListenerService() {
     val db = AppDatabase.getInstance(applicationContext)
     repository = NotificationRepository(db.notificationDao())
     settingsRepository = SettingsRepository.getInstance(applicationContext)
+
+    // Ensure persistent foreground service is active immediately
+    startForegroundServiceSafely()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     super.onStartCommand(intent, flags, startId)
+    startForegroundServiceSafely()
     return START_STICKY
+  }
+
+  private fun startForegroundServiceSafely() {
+    try {
+      val channelId = "notification_tracker_persistent_channel"
+      val notificationManager = getSystemService(NotificationManager::class.java)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+          channelId,
+          "Background Monitoring Service",
+          NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+          description = "Maintains 24/7 notification monitoring in background"
+          setShowBadge(false)
+          enableLights(false)
+          enableVibration(false)
+          setSound(null, null)
+        }
+        notificationManager?.createNotificationChannel(channel)
+      }
+
+      val pendingIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java).apply {
+          flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        },
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0,
+      )
+
+      val notification = NotificationCompat.Builder(this, channelId)
+        .setSmallIcon(R.mipmap.ic_launcher)
+        .setContentTitle("Notification Tracker Active")
+        .setContentText("Monitoring device notifications in background")
+        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setOngoing(true)
+        .setContentIntent(pendingIntent)
+        .build()
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(
+          PERSISTENT_NOTIFICATION_ID,
+          notification,
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
+      } else {
+        startForeground(PERSISTENT_NOTIFICATION_ID, notification)
+      }
+      Log.d(TAG, "Foreground service running to prevent OEM task killer termination.")
+    } catch (e: Exception) {
+      Log.w(TAG, "startForegroundServiceSafely exception", e)
+    }
   }
 
   override fun onDestroy() {
@@ -225,8 +289,8 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
     val dedupKey = "$sourcePackage|$title|$text"
     val lastSeen = recentNotificationTimestamps[dedupKey]
-    if (lastSeen != null && (now - lastSeen) < 5000L) {
-      Log.d(TAG, "Deduplication: Skipped rapid burst duplicate within 5s from $sourcePackage: $title")
+    if (lastSeen != null && (now - lastSeen) < 1500L) {
+      Log.d(TAG, "Deduplication: Skipped rapid burst duplicate within 1.5s from $sourcePackage: $title")
       return
     }
     recentNotificationTimestamps[dedupKey] = now
@@ -263,6 +327,7 @@ class NotificationTrackerListenerService : NotificationListenerService() {
 
   companion object {
     private const val TAG = "NotifTrackerListener"
+    private const val PERSISTENT_NOTIFICATION_ID = 8801
     private val recentNotificationTimestamps = ConcurrentHashMap<String, Long>()
 
     @Volatile

@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    startTrackingServiceSafely()
 
     val settingsRepo = SettingsRepository.getInstance(this)
     val appLockEnabled = settingsRepo.isAppLockEnabled()
@@ -135,8 +136,21 @@ class MainActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
-    // Rebind listener service if access is granted (critical for Xiaomi / MIUI / HyperOS)
+    startTrackingServiceSafely()
     NotificationAccessUtils.triggerServiceRebind(this)
+  }
+
+  private fun startTrackingServiceSafely() {
+    try {
+      val serviceIntent = Intent(this, com.example.service.NotificationTrackerListenerService::class.java)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        startForegroundService(serviceIntent)
+      } else {
+        startService(serviceIntent)
+      }
+    } catch (e: Exception) {
+      Log.w("MainActivity", "Failed to start tracking service", e)
+    }
   }
 }
 

@@ -147,12 +147,6 @@ class MainActivity : ComponentActivity() {
 
   private fun startTrackingServiceSafely() {
     NotificationMonitorForegroundService.start(this)
-  } else {
-        startService(serviceIntent)
-      }
-    } catch (e: Exception) {
-      Log.w("MainActivity", "Failed to start tracking service", e)
-    }
   }
 }
 

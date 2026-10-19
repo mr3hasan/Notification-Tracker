@@ -62,6 +62,14 @@ class MainActivity : ComponentActivity() {
   private var isUnlocked by mutableStateOf(false)
   private var authErrorMessage by mutableStateOf<String?>(null)
 
+  private val requestNotificationPermissionLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { isGranted ->
+    if (isGranted) {
+      startTrackingServiceSafely()
+    }
+  }
+
   private val deviceCredentialLauncher = registerForActivityResult(
     ActivityResultContracts.StartActivityForResult()
   ) { result ->
@@ -77,6 +85,12 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     startTrackingServiceSafely()
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+      }
+    }
 
     val settingsRepo = SettingsRepository.getInstance(this)
     val appLockEnabled = settingsRepo.isAppLockEnabled()

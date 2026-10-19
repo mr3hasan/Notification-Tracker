@@ -55,27 +55,9 @@ object NotificationAccessUtils {
     try {
       if (!isNotificationAccessGranted(context)) return
       val component = ComponentName(context, NotificationTrackerListenerService::class.java)
-      try {
-        android.service.notification.NotificationListenerService.requestRebind(component)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        NotificationListenerService.requestRebind(component)
         Log.d(TAG, "Executed NotificationListenerService.requestRebind.")
-      } catch (e: Exception) {
-        Log.w(TAG, "requestRebind failed", e)
-      }
-      if (!NotificationTrackerListenerService.isConnected) {
-        try {
-          val pm = context.packageManager
-          pm.setComponentEnabledSetting(
-            component,
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.DONT_KILL_APP,
-          )
-          pm.setComponentEnabledSetting(
-            component,
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP,
-          )
-          Log.d(TAG, "Revived NotificationListenerService component.")
-        } catch (ignored: Exception) {}
       }
     } catch (e: Exception) {
       Log.e(TAG, "Failed to rebind NotificationListenerService", e)

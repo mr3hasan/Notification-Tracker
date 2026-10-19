@@ -368,7 +368,7 @@ fun SettingsScreen(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
               ),
             ) {
-              Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+              Icon(Icons.AutoMirrored.Filled.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
               Spacer(Modifier.width(8.dp))
               Text("Xiaomi / HyperOS Autostart Settings")
             }

@@ -352,6 +352,27 @@ fun SettingsScreen(
               }
             }
 
+            Button(
+              onClick = {
+                val opened = NotificationAccessUtils.openXiaomiAutostartSettings(context)
+                if (!opened) {
+                  NotificationAccessUtils.openBatteryOptimizationSettings(context)
+                }
+              },
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("btn_xiaomi_autostart"),
+              shape = RoundedCornerShape(12.dp),
+              colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+              ),
+            ) {
+              Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
+              Spacer(Modifier.width(8.dp))
+              Text("Xiaomi / HyperOS Autostart Settings")
+            }
+
             if (!isBatteryIgnored) {
               Button(
                 onClick = {

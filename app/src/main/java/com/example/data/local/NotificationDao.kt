@@ -47,12 +47,14 @@ interface NotificationDao {
     SELECT * FROM notifications 
     WHERE notification_key = :notificationKey 
       AND content = :content 
+      AND post_time >= :minPostTime
     LIMIT 1
     """,
   )
-  suspend fun findByKeyAndContent(
+  suspend fun findRecentByKeyAndContent(
     notificationKey: String,
     content: String,
+    minPostTime: Long,
   ): NotificationRecord?
 
   @Query(

@@ -55,6 +55,7 @@ import com.example.ui.NotificationTrackerApp
 import com.example.ui.theme.NotificationTrackerTheme
 import com.example.util.AppLockManager
 import com.example.util.NotificationAccessUtils
+import com.example.service.NotificationMonitorForegroundService
 
 class MainActivity : ComponentActivity() {
 
@@ -145,11 +146,8 @@ class MainActivity : ComponentActivity() {
   }
 
   private fun startTrackingServiceSafely() {
-    try {
-      val serviceIntent = Intent(this, com.example.service.NotificationTrackerListenerService::class.java)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        startForegroundService(serviceIntent)
-      } else {
+    NotificationMonitorForegroundService.start(this)
+  } else {
         startService(serviceIntent)
       }
     } catch (e: Exception) {

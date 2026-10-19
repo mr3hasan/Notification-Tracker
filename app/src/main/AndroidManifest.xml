@@ -32,6 +32,12 @@
             </intent-filter>
         </activity>
 
+                <!-- Dedicated 24/7 Foreground Service to prevent MIUI/OEM kill -->
+        <service
+            android:name=".service.NotificationMonitorForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <!-- NotificationListenerService registration -->
         <service
             android:name=".service.NotificationTrackerListenerService"

@@ -153,6 +153,24 @@ object NotificationAccessUtils {
   /**
    * Opens the system battery optimization settings screen so the user can ensure background collection never gets killed by OEM task killers.
    */
+  fun openXiaomiAutostartSettings(context: Context): Boolean {
+    val intents = listOf(
+      Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+      Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManageActivity")),
+      Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT),
+    )
+    for (intent in intents) {
+      try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (intent.resolveActivity(context.packageManager) != null) {
+          context.startActivity(intent)
+          return true
+        }
+      } catch (ignored: Exception) {}
+    }
+    return false
+  }
+
   fun openBatteryOptimizationSettings(context: Context): Boolean {
     // Strategy 1: Direct request intent
     try {

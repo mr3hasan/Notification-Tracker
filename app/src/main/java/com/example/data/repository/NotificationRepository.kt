@@ -33,11 +33,15 @@ class NotificationRepository(private val notificationDao: NotificationDao) {
       return false
     }
 
-    // 2. Active notification re-post check:
-    // If the same notificationKey already exists in the database with the exact same content,
+    // 2. Active notification re-post check within last 3 minutes:
+    // If the same notificationKey already exists in the database with the exact same content within 3 minutes,
     // do not create duplicate entries when the OS simply refreshes or unbundles the status bar item.
     if (record.notificationKey.isNotBlank()) {
-      val existingWithKey = notificationDao.findByKeyAndContent(record.notificationKey, record.content)
+      val existingWithKey = notificationDao.findRecentByKeyAndContent(
+        notificationKey = record.notificationKey,
+        content = record.content,
+        minPostTime = record.postTime - 180_000L,
+      )
       if (existingWithKey != null) {
         return false
       }

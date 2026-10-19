@@ -77,6 +77,7 @@ import com.example.data.local.NotificationRecord
 import com.example.ui.components.AppIconImage
 import com.example.ui.viewmodel.HomeViewModel
 import com.example.util.NotificationAccessUtils
+import com.example.service.NotificationMonitorForegroundService
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -113,6 +114,7 @@ fun HomeScreen(
         isAccessGranted = granted
         if (granted) {
           NotificationAccessUtils.triggerServiceRebind(context)
+          NotificationMonitorForegroundService.start(context)
         }
       }
     }

@@ -18,14 +18,7 @@ class BootReceiver : BroadcastReceiver() {
       action == Intent.ACTION_MY_PACKAGE_REPLACED ||
       action == "android.intent.action.QUICKBOOT_POWERON"
     ) {
-      try {
-        val serviceIntent = Intent(context, NotificationTrackerListenerService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-          context.startForegroundService(serviceIntent)
-        } else {
-          context.startService(serviceIntent)
-        }
-      } catch (ignored: Exception) {}
+      NotificationMonitorForegroundService.start(context)
       NotificationAccessUtils.triggerServiceRebind(context)
     }
   }

@@ -56,7 +56,7 @@ object NotificationAccessUtils {
       if (!isNotificationAccessGranted(context)) return
       val component = ComponentName(context, NotificationTrackerListenerService::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        NotificationListenerService.requestRebind(component)
+        android.service.notification.NotificationListenerService.requestRebind(component)
         Log.d(TAG, "Executed NotificationListenerService.requestRebind.")
       }
     } catch (e: Exception) {

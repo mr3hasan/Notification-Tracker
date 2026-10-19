@@ -373,6 +373,24 @@ fun SettingsScreen(
               Text("Xiaomi / HyperOS Autostart Settings")
             }
 
+            Button(
+              onClick = {
+                NotificationAccessUtils.openNotificationChannelSettings(context)
+              },
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("btn_hide_status_icon"),
+              shape = RoundedCornerShape(12.dp),
+              colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+            ) {
+              Icon(Icons.Default.NotificationsOff, contentDescription = null, modifier = Modifier.size(18.dp))
+              Spacer(Modifier.width(8.dp))
+              Text("Hide Status Bar Icon (Notification Settings)")
+            }
+
             if (!isBatteryIgnored) {
               Button(
                 onClick = {

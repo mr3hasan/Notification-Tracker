@@ -46,13 +46,16 @@ class NotificationMonitorForegroundService : Service() {
 
   private fun startForegroundSafely() {
     try {
-      val channelId = "notification_tracker_persistent_channel"
+      val channelId = "notification_tracker_persistent_channel_v2"
       val notificationManager = getSystemService(NotificationManager::class.java)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        try {
+          notificationManager?.deleteNotificationChannel("notification_tracker_persistent_channel")
+        } catch (ignored: Exception) {}
         val channel = NotificationChannel(
           channelId,
           "Background Monitoring Service",
-          NotificationManager.IMPORTANCE_LOW,
+          NotificationManager.IMPORTANCE_MIN,
         ).apply {
           description = "Maintains 24/7 notification monitoring in background"
           setShowBadge(false)
@@ -76,7 +79,7 @@ class NotificationMonitorForegroundService : Service() {
         .setSmallIcon(R.mipmap.ic_launcher)
         .setContentTitle("Notification Tracker Active")
         .setContentText("Monitoring device notifications 24/7 in background")
-        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setPriority(NotificationCompat.PRIORITY_MIN)
         .setOngoing(true)
         .setContentIntent(pendingIntent)
         .build()

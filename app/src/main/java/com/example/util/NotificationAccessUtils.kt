@@ -135,6 +135,24 @@ object NotificationAccessUtils {
   /**
    * Opens the system battery optimization settings screen so the user can ensure background collection never gets killed by OEM task killers.
    */
+  fun openNotificationChannelSettings(context: Context): Boolean {
+    return try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+          putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+          putExtra(Settings.EXTRA_CHANNEL_ID, "notification_tracker_persistent_channel_v2")
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        true
+      } else {
+        openNotificationListenerSettings(context)
+      }
+    } catch (e: Exception) {
+      false
+    }
+  }
+
   fun openXiaomiAutostartSettings(context: Context): Boolean {
     val intents = listOf(
       Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
